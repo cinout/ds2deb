@@ -11,14 +11,14 @@ def get_loader(args):
         aug_type = "MVTec_AUG"
     else:
         if args.instance_loss_func == "Cosine":
-            aug_type == "BYOL"
+            aug_type = "BYOL"
         elif args.instance_loss_func in ["DistAug_MOCOv2", "DistAug_SimCLR", "RotPred"]:
             # RotPred uses its own augmentation, here DistAug is just a dummy
-            aug_type == "DistAug"
+            aug_type = "DistAug"
         elif args.instance_loss_func == "MOCOv2":
-            aug_type == "MOCOv2"
+            aug_type = "MOCOv2"
         elif args.instance_loss_func == "SimCLR":
-            aug_type == "SimCLR"
+            aug_type = "SimCLR"
         else:
             raise ValueError(
                 f"Invalid instance_loss_func option: {args.instance_loss_func}"
