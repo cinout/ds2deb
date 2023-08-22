@@ -170,7 +170,7 @@ def eval_on_device(categories, args: Namespace):
         k = k.replace(target_module, "")
         pretrained_model[k] = v
 
-    encoder = resnet.__dict__["resnet18"](head_type=args.head_type)
+    encoder = resnet.__dict__["resnet18"]
     encoder.load_state_dict(pretrained_model)
     encoder = encoder.to(device)
     encoder.eval()  # set model to eval mode

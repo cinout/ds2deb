@@ -149,7 +149,6 @@ class ResNet(nn.Module):
         low_dim=128,
         avg_down=False,
         deep_stem=False,
-        head_type="mlp_head",
         layer4_dilation=1,
     ):
         super(ResNet, self).__init__()
@@ -193,23 +192,6 @@ class ResNet(nn.Module):
         else:
             raise NotImplementedError
         self.avgpool = nn.AvgPool2d(7, stride=1)
-
-        self.head_type = head_type
-        if head_type == "mlp_head":
-            self.fc1 = nn.Linear(mid_dim, mid_dim)
-            self.relu2 = nn.ReLU(inplace=True)
-            self.fc2 = nn.Linear(mid_dim, low_dim)
-        elif head_type == "reduce":
-            self.fc = nn.Linear(mid_dim, low_dim)
-        elif head_type == "conv_head":
-            self.fc1 = nn.Conv2d(mid_dim, mid_dim, kernel_size=1, bias=False)
-            self.bn2 = nn.BatchNorm2d(2048)
-            self.relu2 = nn.ReLU(inplace=True)
-            self.fc2 = nn.Linear(mid_dim, low_dim)
-        elif head_type in ["pass", "early_return", "multi_layer", "c3c4c5", "c4c5"]:
-            pass
-        else:
-            raise NotImplementedError
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -291,40 +273,8 @@ class ResNet(nn.Module):
         c3 = self.layer2(c2)
         c4 = self.layer3(c3)
         c5 = self.layer4(c4)
-        if self.head_type == "multi_layer":
-            return c2, c3, c4, c5
 
-        if self.head_type == "early_return":
-            return c5
-
-        if self.head_type == "c4c5":
-            return c4, c5
-        if self.head_type == "c3c4c5":
-            return c3, c4, c5
-
-        if self.head_type != "conv_head":
-            c5 = self.avgpool(c5)
-            c5 = c5.view(c5.size(0), -1)
-
-        if self.head_type == "mlp_head":
-            out = self.fc1(c5)
-            out = self.relu2(out)
-            out = self.fc2(out)
-        elif self.head_type == "reduce":
-            out = self.fc(c5)
-        elif self.head_type == "conv_head":
-            out = self.fc1(c5)
-            out = self.bn2(out)
-            out = self.relu2(out)
-            out = self.avgpool(out)
-            out = out.view(out.size(0), -1)
-            out = self.fc2(out)
-        elif self.head_type == "pass":
-            return c5
-        else:
-            raise NotImplementedError
-
-        return out
+        return c4, c5
 
 
 def resnet18(**kwargs):

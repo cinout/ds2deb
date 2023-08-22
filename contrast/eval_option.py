@@ -82,9 +82,6 @@ def parse_option():
         help="any personal note for this evaluation",
     )
     parser.add_argument(
-        "--head_type", type=str, default="early_return", help="choose head type"
-    )
-    parser.add_argument(
         "--ckpt_epoch",
         nargs="+",
         required=False,

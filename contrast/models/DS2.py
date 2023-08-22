@@ -146,7 +146,7 @@ class RotPredHead(nn.Module):
         return x
 
 
-def pixpro_loss(q, k, q_bb, k_bb, coord_q, coord_k, add_1_pair=True, pos_ratio=0.5):
+def ds2_loss(q, k, q_bb, k_bb, coord_q, coord_k, add_1_pair=True, pos_ratio=0.1):
     """
     coord_q, coord_k: N * 4 (x_upper_left, y_upper_left, x_lower_right, y_lower_right)
     """
@@ -372,7 +372,6 @@ class DS2(nn.Module):
         # parse arguments
         self.pixpro_p = args.pixpro_p
         self.pixpro_momentum = args.pixpro_momentum
-        self.pixpro_pos_ratio = args.pixpro_pos_ratio
         self.pixpro_clamp_value = args.pixpro_clamp_value
         self.pixpro_transform_layer = args.pixpro_transform_layer
 
@@ -381,16 +380,12 @@ class DS2(nn.Module):
         self.instance_loss_weight = args.instance_loss_weight
         self.instance_loss_func = args.instance_loss_func
         self.instance_branch_class_aware = args.instance_branch_class_aware
-
-        self.head_type = args.head_type
-        self.add_1_pair = args.add_1_pair
         self.head_dims = args.head_dims
 
         #######
         ###  create online & momentum encoder
         #######
         self.encoder = base_encoder(
-            head_type=args.head_type,
             low_dim=args.feature_dim,
             in_channel=args.in_channel,
         )
@@ -401,7 +396,6 @@ class DS2(nn.Module):
             and self.instance_loss_func in ["DistAug_SimCLR", "SimCLR", "RotPred"]
         ):
             self.encoder_k = base_encoder(
-                head_type=args.head_type,
                 low_dim=args.feature_dim,
                 in_channel=args.in_channel,
             )  # create the encoder_k (momentum)
@@ -425,55 +419,37 @@ class DS2(nn.Module):
         ###  create dense-branch online & momentum projector
         #######
         if self.dense_loss_weight > 0.0:
-            if self.head_type == "c4c5":
-                self.projector_c4 = (
-                    Proj_Head(in_dim=256) if args.arch == "resnet18" else Proj_Head()
-                )
-                self.projector_c5 = (
-                    Proj_Head(in_dim=512) if args.arch == "resnet18" else Proj_Head()
-                )
+            self.projector_c4 = (
+                Proj_Head(in_dim=256) if args.arch == "resnet18" else Proj_Head()
+            )
+            self.projector_c5 = (
+                Proj_Head(in_dim=512) if args.arch == "resnet18" else Proj_Head()
+            )
 
-                self.projector_k_c4 = (
-                    Proj_Head(in_dim=256) if args.arch == "resnet18" else Proj_Head()
-                )  # create the encoder_k (momentum)
-                self.projector_k_c5 = (
-                    Proj_Head(in_dim=512) if args.arch == "resnet18" else Proj_Head()
-                )  # create the encoder_k (momentum)
+            self.projector_k_c4 = (
+                Proj_Head(in_dim=256) if args.arch == "resnet18" else Proj_Head()
+            )  # create the encoder_k (momentum)
+            self.projector_k_c5 = (
+                Proj_Head(in_dim=512) if args.arch == "resnet18" else Proj_Head()
+            )  # create the encoder_k (momentum)
 
-                for param_q, param_k in zip(
-                    self.projector_c4.parameters(), self.projector_k_c4.parameters()
-                ):
-                    param_k.data.copy_(param_q.data)
-                    param_k.requires_grad = False
+            for param_q, param_k in zip(
+                self.projector_c4.parameters(), self.projector_k_c4.parameters()
+            ):
+                param_k.data.copy_(param_q.data)
+                param_k.requires_grad = False
 
-                for param_q, param_k in zip(
-                    self.projector_c5.parameters(), self.projector_k_c5.parameters()
-                ):
-                    param_k.data.copy_(param_q.data)
-                    param_k.requires_grad = False
+            for param_q, param_k in zip(
+                self.projector_c5.parameters(), self.projector_k_c5.parameters()
+            ):
+                param_k.data.copy_(param_q.data)
+                param_k.requires_grad = False
 
-                if torch.cuda.is_available():
-                    nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_c4)
-                    nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_k_c4)
-                    nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_c5)
-                    nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_k_c5)
-            else:
-                self.projector = (
-                    Proj_Head(in_dim=512) if args.arch == "resnet18" else Proj_Head()
-                )
-                self.projector_k = (
-                    Proj_Head(in_dim=512) if args.arch == "resnet18" else Proj_Head()
-                )  # create the encoder_k (momentum)
-
-                for param_q, param_k in zip(
-                    self.projector.parameters(), self.projector_k.parameters()
-                ):
-                    param_k.data.copy_(param_q.data)
-                    param_k.requires_grad = False
-
-                if torch.cuda.is_available():
-                    nn.SyncBatchNorm.convert_sync_batchnorm(self.projector)
-                    nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_k)
+            if torch.cuda.is_available():
+                nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_c4)
+                nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_k_c4)
+                nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_c5)
+                nn.SyncBatchNorm.convert_sync_batchnorm(self.projector_k_c5)
 
         self.K = int(
             args.num_instances * 1.0 / get_world_size() / args.batch_size * args.epochs
@@ -602,26 +578,19 @@ class DS2(nn.Module):
         ###  update dense-branch momentum projector
         #######
         if self.dense_loss_weight > 0.0:
-            if self.head_type == "c4c5":
-                for param_q, param_k in zip(
-                    self.projector_c4.parameters(), self.projector_k_c4.parameters()
-                ):
-                    param_k.data = param_k.data * _contrast_momentum + param_q.data * (
-                        1.0 - _contrast_momentum
-                    )
-                for param_q, param_k in zip(
-                    self.projector_c5.parameters(), self.projector_k_c5.parameters()
-                ):
-                    param_k.data = param_k.data * _contrast_momentum + param_q.data * (
-                        1.0 - _contrast_momentum
-                    )
-            else:
-                for param_q, param_k in zip(
-                    self.projector.parameters(), self.projector_k.parameters()
-                ):
-                    param_k.data = param_k.data * _contrast_momentum + param_q.data * (
-                        1.0 - _contrast_momentum
-                    )
+            for param_q, param_k in zip(
+                self.projector_c4.parameters(), self.projector_k_c4.parameters()
+            ):
+                param_k.data = param_k.data * _contrast_momentum + param_q.data * (
+                    1.0 - _contrast_momentum
+                )
+            for param_q, param_k in zip(
+                self.projector_c5.parameters(), self.projector_k_c5.parameters()
+            ):
+                param_k.data = param_k.data * _contrast_momentum + param_q.data * (
+                    1.0 - _contrast_momentum
+                )
+
         #######
         ###  update instance-branch momentum projector_instance
         #######
@@ -720,60 +689,40 @@ class DS2(nn.Module):
         ################
         # get features from encoder
         ################
-        if self.head_type == "c4c5" and self.dense_loss_weight > 0.0:
-            feat_1_c4, feat_1_c5 = self.encoder(
-                im_1
-            )  # feat1_c4.shape: (bs,256,14,14), feat1_c5.shape: (bs,512,7,7)
-            feat_2_c4, feat_2_c5 = self.encoder(im_2)
-        else:
-            feat_1 = self.encoder(im_1)  # shape: (bs,512,7,7)
-            feat_2 = self.encoder(im_2)
-
-            if self.instance_loss_weight > 0.0 and self.instance_loss_func == "RotPred":
-                # get rotated images' features from encoder
-                feat_1_rot = self.encoder(im_1_rot)  # shape: (bs,512,7,7)
-                feat_2_rot = self.encoder(im_2_rot)
+        feat_1_c4, feat_1_c5 = self.encoder(
+            im_1
+        )  # feat1_c4.shape: (bs,256,14,14), feat1_c5.shape: (bs,512,7,7)
+        feat_2_c4, feat_2_c5 = self.encoder(im_2)
 
         ################
         # get dense-branch features from projector g
         ################
         if self.dense_loss_weight > 0.0:
-            if self.head_type == "c4c5":
-                proj_1_c4 = self.projector_c4(
-                    feat_1_c4
-                )  # shape: (bs,256,14,14), NOT NORMALIZED
-                proj_2_c4 = self.projector_c4(feat_2_c4)
-                proj_1_c5 = self.projector_c5(
-                    feat_1_c5
-                )  # shape: (bs,256,7,7), NOT NORMALIZED
-                proj_2_c5 = self.projector_c5(feat_2_c5)
-            else:
-                proj_1 = self.projector(feat_1)
-                proj_2 = self.projector(feat_2)
-                # shape: (bs,256,7,7), NOT NORMALIZED
+            proj_1_c4 = self.projector_c4(
+                feat_1_c4
+            )  # shape: (bs,256,14,14), NOT NORMALIZED
+            proj_2_c4 = self.projector_c4(feat_2_c4)
+            proj_1_c5 = self.projector_c5(
+                feat_1_c5
+            )  # shape: (bs,256,7,7), NOT NORMALIZED
+            proj_2_c5 = self.projector_c5(feat_2_c5)
 
         ################
         # get dense-branch features from predictor
         ################
         if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["DS2"]:
-            if self.head_type == "c4c5":
-                pred_1_c4 = self.featprop(proj_1_c4)  # shape: (bs,256,14,14)
-                pred_1_c4 = F.normalize(pred_1_c4, dim=1)  # shape: (bs,256,14,14)
-                pred_2_c4 = self.featprop(
-                    proj_2_c4,
-                )
-                pred_2_c4 = F.normalize(pred_2_c4, dim=1)
-                pred_1_c5 = self.featprop(proj_1_c5)  # shape: (bs,256,14,14)
-                pred_1_c5 = F.normalize(pred_1_c5, dim=1)  # shape: (bs,256,14,14)
-                pred_2_c5 = self.featprop(
-                    proj_2_c5,
-                )
-                pred_2_c5 = F.normalize(pred_2_c5, dim=1)
-            else:
-                pred_1 = self.featprop(proj_1)  # shape: (bs,256,7,7)
-                pred_1 = F.normalize(pred_1, dim=1)  # shape: (bs,256,7,7)
-                pred_2 = self.featprop(proj_2)
-                pred_2 = F.normalize(pred_2, dim=1)
+            pred_1_c4 = self.featprop(proj_1_c4)  # shape: (bs,256,14,14)
+            pred_1_c4 = F.normalize(pred_1_c4, dim=1)  # shape: (bs,256,14,14)
+            pred_2_c4 = self.featprop(
+                proj_2_c4,
+            )
+            pred_2_c4 = F.normalize(pred_2_c4, dim=1)
+            pred_1_c5 = self.featprop(proj_1_c5)  # shape: (bs,256,14,14)
+            pred_1_c5 = F.normalize(pred_1_c5, dim=1)  # shape: (bs,256,14,14)
+            pred_2_c5 = self.featprop(
+                proj_2_c5,
+            )
+            pred_2_c5 = F.normalize(pred_2_c5, dim=1)
 
         ################
         # get instance-branch features from instance branch predictor g
@@ -853,7 +802,7 @@ class DS2(nn.Module):
             # first, update the momentum encoder/projector/projector_instance's parameters
             self._momentum_update_key_encoder()
 
-            if self.head_type == "c4c5" and self.dense_loss_weight > 0.0:
+            if self.dense_loss_weight > 0.0:
                 feat_1_ng_c4, feat_1_ng_c5 = self.encoder_k(im_1)
                 feat_2_ng_c4, feat_2_ng_c5 = self.encoder_k(im_2)
             elif not (
@@ -865,20 +814,14 @@ class DS2(nn.Module):
                 feat_2_ng = self.encoder_k(im_2)
 
             if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["DS2"]:
-                if self.head_type == "c4c5":
-                    proj_1_ng_c4 = self.projector_k_c4(feat_1_ng_c4)
-                    proj_2_ng_c4 = self.projector_k_c4(feat_2_ng_c4)
-                    proj_1_ng_c5 = self.projector_k_c5(feat_1_ng_c5)
-                    proj_2_ng_c5 = self.projector_k_c5(feat_2_ng_c5)
-                    proj_1_ng_c4 = F.normalize(proj_1_ng_c4, dim=1)
-                    proj_2_ng_c4 = F.normalize(proj_2_ng_c4, dim=1)
-                    proj_1_ng_c5 = F.normalize(proj_1_ng_c5, dim=1)
-                    proj_2_ng_c5 = F.normalize(proj_2_ng_c5, dim=1)
-                else:
-                    proj_1_ng = self.projector_k(feat_1_ng)
-                    proj_2_ng = self.projector_k(feat_2_ng)
-                    proj_1_ng = F.normalize(proj_1_ng, dim=1)
-                    proj_2_ng = F.normalize(proj_2_ng, dim=1)
+                proj_1_ng_c4 = self.projector_k_c4(feat_1_ng_c4)
+                proj_2_ng_c4 = self.projector_k_c4(feat_2_ng_c4)
+                proj_1_ng_c5 = self.projector_k_c5(feat_1_ng_c5)
+                proj_2_ng_c5 = self.projector_k_c5(feat_2_ng_c5)
+                proj_1_ng_c4 = F.normalize(proj_1_ng_c4, dim=1)
+                proj_2_ng_c4 = F.normalize(proj_2_ng_c4, dim=1)
+                proj_1_ng_c5 = F.normalize(proj_1_ng_c5, dim=1)
+                proj_2_ng_c5 = F.normalize(proj_2_ng_c5, dim=1)
 
             if self.instance_loss_weight > 0.0 and self.instance_loss_func not in [
                 "RotPred",
@@ -909,70 +852,41 @@ class DS2(nn.Module):
         loss_instance = 0.0
 
         if self.dense_loss_weight > 0.0:
-            if self.head_type == "c4c5":
-                loss_dense = 0.5 * (
-                    pixpro_loss(
-                        pred_1_c4,
-                        proj_2_ng_c4,
-                        feat_1_c4,
-                        feat_2_ng_c4,
-                        coord1,
-                        coord2,
-                        self.add_1_pair,
-                        self.pixpro_pos_ratio,
-                    )
-                    + pixpro_loss(
-                        pred_2_c4,
-                        proj_1_ng_c4,
-                        feat_2_c4,
-                        feat_1_ng_c4,
-                        coord2,
-                        coord1,
-                        self.add_1_pair,
-                        self.pixpro_pos_ratio,
-                    )
-                ) + 0.5 * (
-                    pixpro_loss(
-                        pred_1_c5,
-                        proj_2_ng_c5,
-                        feat_1_c5,
-                        feat_2_ng_c5,
-                        coord1,
-                        coord2,
-                        self.add_1_pair,
-                        self.pixpro_pos_ratio,
-                    )
-                    + pixpro_loss(
-                        pred_2_c5,
-                        proj_1_ng_c5,
-                        feat_2_c5,
-                        feat_1_ng_c5,
-                        coord2,
-                        coord1,
-                        self.add_1_pair,
-                        self.pixpro_pos_ratio,
-                    )
-                )
-            else:
-                loss_dense = pixpro_loss(
-                    pred_1,
-                    proj_2_ng,
-                    feat_1,
-                    feat_2_ng,
+            loss_dense = 0.5 * (
+                ds2_loss(
+                    pred_1_c4,
+                    proj_2_ng_c4,
+                    feat_1_c4,
+                    feat_2_ng_c4,
                     coord1,
                     coord2,
-                    self.add_1_pair,
-                    self.pixpro_pos_ratio,
-                ) + pixpro_loss(
-                    pred_2,
-                    proj_1_ng,
-                    feat_2,
-                    feat_1_ng,
+                )
+                + ds2_loss(
+                    pred_2_c4,
+                    proj_1_ng_c4,
+                    feat_2_c4,
+                    feat_1_ng_c4,
                     coord2,
                     coord1,
-                    self.add_1_pair,
-                    self.pixpro_pos_ratio,
                 )
+            ) + 0.5 * (
+                ds2_loss(
+                    pred_1_c5,
+                    proj_2_ng_c5,
+                    feat_1_c5,
+                    feat_2_ng_c5,
+                    coord1,
+                    coord2,
+                )
+                + ds2_loss(
+                    pred_2_c5,
+                    proj_1_ng_c5,
+                    feat_2_c5,
+                    feat_1_ng_c5,
+                    coord2,
+                    coord1,
+                )
+            )
 
         if self.instance_loss_weight > 0.0:
             if self.instance_loss_func in ["SimCLR", "DistAug_SimCLR"]:

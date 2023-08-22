@@ -114,7 +114,7 @@ def eval_on_device(args: Namespace):
         k = k.replace(target_module, "")
         pretrained_model[k] = v
 
-    encoder = resnet.__dict__["resnet18"](head_type=args.head_type)
+    encoder = resnet.__dict__["resnet18"]
     encoder.load_state_dict(pretrained_model)
     encoder = encoder.to(device)
     encoder.eval()  # set model to eval mode
@@ -215,12 +215,12 @@ def eval_on_device(args: Namespace):
     ********************************
     """
     # get test dataset
-    if args.dataset=="KSDD2":
+    if args.dataset == "KSDD2":
         test_dataset = KSDD2TestDataset(
             "./dataset/KSDD2/test/",
             resize_shape=[args.resized_image_size, args.resized_image_size],
         )
-    elif args.dataset=="MTD":
+    elif args.dataset == "MTD":
         test_dataset = MTDTestDataset(
             resize_shape=[args.resized_image_size, args.resized_image_size],
         )

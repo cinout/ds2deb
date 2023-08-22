@@ -93,9 +93,6 @@ def parse_option():
         "--feature-dim", type=int, default=256, help="feature dimension"
     )
     parser.add_argument(
-        "--head-type", type=str, default="early_return", help="head type"
-    )
-    parser.add_argument(
         "--num-workers", type=int, default=4, help="num of workers per GPU to use"
     )
     parser.add_argument(
@@ -163,27 +160,15 @@ def parse_option():
     )
 
     # PixPro arguments
-    parser.add_argument("--pixpro-p", type=float, default=1.0)
+    parser.add_argument("--pixpro-p", type=float, default=2.0)
     parser.add_argument(
         "--pixpro-momentum",
         type=float,
         default=0.99,
         help="momentume parameter used in MoCo and InstDisc",
     )
-    parser.add_argument(
-        "--pixpro-pos-ratio",
-        type=float,
-        default=0.7,
-        help="maximum distance ratio of positive patches",
-    )
-    parser.add_argument(
-        "--pixpro-neg-ratio",
-        type=float,
-        default=1.0,
-        help="minimum distance ratio of negative patches",
-    )
     parser.add_argument("--pixpro-clamp-value", type=float, default=0.0)
-    parser.add_argument("--pixpro-transform-layer", type=int, default=0)
+    parser.add_argument("--pixpro-transform-layer", type=int, default=1)
 
     # loss functions
     parser.add_argument(
@@ -237,18 +222,6 @@ def parse_option():
         type=str,
         default=datetime.now().strftime("%Y%m%d-%H%M%S"),
         help="timestamp for current pre-training",
-    )
-    # parser.add_argument(
-    #     "--timestamp",
-    #     type=str,
-    #     default=datetime.now().strftime("%Y%m%d-%H%M%S")
-    #     + f"-{random.randint(0,99)}-{random.randint(0,99)}",
-    #     help="timestamp for current pre-training",
-    # )
-    parser.add_argument(
-        "--add_1_pair",
-        action="store_true",
-        help="add additional 1 pair to PixPro's positive pair",
     )
     parser.add_argument(
         "--debug_mode",
