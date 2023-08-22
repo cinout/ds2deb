@@ -60,8 +60,8 @@ def parse_option():
         "--model",
         type=str,
         required=True,
-        default="PixPro",
-        choices=["PixPro", "CutPaste"],
+        default="DS2",
+        choices=["DS2", "CutPaste"],
         help="architecture choice",
     )
     parser.add_argument(
@@ -215,8 +215,8 @@ def parse_option():
     parser.add_argument(
         "--dense_loss_func",
         type=str,
-        default="PixPro",
-        choices=["PixPro"],
+        default="DS2",
+        choices=["DS2"],
         help="loss function for dense branch",
     )
 

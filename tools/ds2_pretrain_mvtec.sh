@@ -31,9 +31,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python3 -m torch.distributed.launch --maste
     --instance_loss_weight 0.0 \
     --instance_loss_func DistAug_SimCLR \
     --dense_loss_weight 1.0 \
-    --dense_loss_func PixPro \
+    --dense_loss_func DS2 \
     \
-    --model PixPro \
+    --model DS2 \
     --add_1_pair \
     --epochs 400 \
     --save-freq 100 \

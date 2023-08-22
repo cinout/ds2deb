@@ -90,9 +90,7 @@ def parse_option():
         required=False,
         help="which epoch checkpoint(s) to use for evaluation",
     )
-    parser.add_argument(
-        "--model", type=str, choices=["PixPro", "CutPaste"], default="PixPro"
-    )
+    parser.add_argument("--model", type=str, choices=["DS2", "CutPaste"], default="DS2")
     parser.add_argument(
         "--gde_count", type=str, choices=["one", "patchwise"], default="patchwise"
     )

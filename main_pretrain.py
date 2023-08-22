@@ -210,7 +210,7 @@ def main(args):
         if dist.get_rank() == 0:
             cutpaste_save_checkpoint(args, model)
 
-    elif args.model == "PixPro":
+    elif args.model == "DS2":
         train_loader = get_loader(args)
         args.num_instances = len(train_loader.dataset)
         logger.info(f"length of training dataset: {args.num_instances}")

@@ -365,9 +365,9 @@ def Pred_Head(in_dim=256, inner_dim=4096, out_dim=256):
     return MLP2d(in_dim, inner_dim, out_dim)
 
 
-class PixPro(nn.Module):
+class DS2(nn.Module):
     def __init__(self, base_encoder, args):
-        super(PixPro, self).__init__()
+        super().__init__()
 
         # parse arguments
         self.pixpro_p = args.pixpro_p
@@ -560,9 +560,9 @@ class PixPro(nn.Module):
                         nn.SyncBatchNorm.convert_sync_batchnorm(self.predictor)
 
         #######
-        ###  create value_transform module (used by PixPro)
+        ###  create value_transform module
         #######
-        if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["PixPro"]:
+        if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["DS2"]:
             if self.pixpro_transform_layer == 0:
                 self.value_transform = Identity()
             elif self.pixpro_transform_layer == 1:
@@ -755,7 +755,7 @@ class PixPro(nn.Module):
         ################
         # get dense-branch features from predictor
         ################
-        if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["PixPro"]:
+        if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["DS2"]:
             if self.head_type == "c4c5":
                 pred_1_c4 = self.featprop(proj_1_c4)  # shape: (bs,256,14,14)
                 pred_1_c4 = F.normalize(pred_1_c4, dim=1)  # shape: (bs,256,14,14)
@@ -864,7 +864,7 @@ class PixPro(nn.Module):
                 feat_1_ng = self.encoder_k(im_1)
                 feat_2_ng = self.encoder_k(im_2)
 
-            if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["PixPro"]:
+            if self.dense_loss_weight > 0.0 and self.dense_loss_func in ["DS2"]:
                 if self.head_type == "c4c5":
                     proj_1_ng_c4 = self.projector_k_c4(feat_1_ng_c4)
                     proj_2_ng_c4 = self.projector_k_c4(feat_2_ng_c4)

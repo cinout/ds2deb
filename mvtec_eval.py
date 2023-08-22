@@ -441,7 +441,7 @@ def eval_on_device(categories, args: Namespace):
         #         np.array(image_level_gt_list), np.array(image_level_pred_list)
         # )
         # logger.info(f"Image Level AUROC - {category}: {image_level_auroc}")
-         
+
         pixel_level_auroc = roc_auc_score(
             np.array(pixel_level_gt_list, dtype=np.uint8),
             np.array(pixel_level_pred_list),
@@ -481,7 +481,9 @@ def eval_on_device(categories, args: Namespace):
             np.array(pixel_level_auroc_texture_categories)
         )
         # logger.info(f"Image Level AUROC - Mean (Texture): {image_level_auroc_texture_mean}")
-        logger.info(f"Pixel Level AUROC - Mean (Texture): {pixel_level_auroc_texture_mean}")
+        logger.info(
+            f"Pixel Level AUROC - Mean (Texture): {pixel_level_auroc_texture_mean}"
+        )
 
         # image_level_auroc_object_mean = np.mean(
         #     np.array(image_level_auroc_object_categories)
@@ -490,7 +492,9 @@ def eval_on_device(categories, args: Namespace):
             np.array(pixel_level_auroc_object_categories)
         )
         # logger.info(f"Image Level AUROC - Mean (Object): {image_level_auroc_object_mean}")
-        logger.info(f"Pixel Level AUROC - Mean (Object): {pixel_level_auroc_object_mean}")
+        logger.info(
+            f"Pixel Level AUROC - Mean (Object): {pixel_level_auroc_object_mean}"
+        )
 
 
 if __name__ == "__main__":
@@ -538,7 +542,7 @@ if __name__ == "__main__":
                 "screw",
             ]
             eval_on_device(picked_classes, parsed_args)
-        elif parsed_args.model == "PixPro":
+        elif parsed_args.model == "DS2":
             if parsed_args.dataset == "MVTEC":
                 nonalign_types = [
                     "carpet",
