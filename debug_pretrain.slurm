@@ -11,7 +11,7 @@
 
 #SBATCH --job-name="deb"
 #SBATCH --account=punim1623
-#SBATCH --time=0-00:10:00
+#SBATCH --time=0-00:06:00
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
